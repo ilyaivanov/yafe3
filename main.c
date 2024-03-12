@@ -3,6 +3,8 @@
 #include "deflib.c"
 #include "types.h"
 #include "win32.c"
+
+#include "format.c"
 #include "font.c"
 
 
@@ -18,6 +20,8 @@ i32 isFullscreen = 0;
 FontData font;
 BITMAPINFO bitmapInfo;
 u32 selectedChar;
+u32 lastFrames[20];
+u32 currentFrame;
 
 inline void CopyBitmapRectTo(MyBitmap *sourceT, MyBitmap *destination, u32 offsetX, u32 offsetY)
 {
@@ -122,6 +126,10 @@ void WinMainCRTStartup()
     FileContent file = ReadMyFileImp("..\\main.c");
 
     MSG msg;
+    LARGE_INTEGER frequency = {0};
+    LARGE_INTEGER start = {0};
+    QueryPerformanceFrequency(&frequency);
+    QueryPerformanceCounter(&start);
     while(isRunning)
     {
         while(PeekMessageA(&msg, 0, 0, 0, PM_REMOVE))
@@ -171,11 +179,59 @@ void WinMainCRTStartup()
             ch++;
         }
 
+
+
+
+        LARGE_INTEGER end = {0};
+        QueryPerformanceCounter(&end);
+
+        u32 usPerFrame = (u32)((f32)((end.QuadPart - start.QuadPart) * 1000 * 1000) / (f32)frequency.QuadPart);
+        lastFrames[currentFrame] = usPerFrame;
+        currentFrame = (currentFrame + 1) % ArrayLength(lastFrames);
+        i32 hasAnyZeroFrame = 0;
+        {
+            u32 averageFrame = 0;
+            for(int i = 0; i < ArrayLength(lastFrames); i++)
+            {
+                if(!lastFrames[i])
+                    hasAnyZeroFrame = 1;
+                averageFrame += lastFrames[i];
+            }
+
+            if(!hasAnyZeroFrame)
+            {
+                averageFrame /= ArrayLength(lastFrames);
+
+                char buff[30];
+                i32 symbols = FormatNumber(averageFrame, buff);
+                i32 x = screenWidth - charWidth * (symbols + 2);
+                i32 y = screenHeight - charHeight;
+                buff[symbols] = 'u';
+                buff[symbols + 1] = 's';
+                buff[symbols + 2] = '\0';
+
+                char* ch = buff;
+                while(*ch)
+                {
+                    MyBitmap *texture = &font.textures[*ch];
+                    CopyBitmapRectTo(texture, &canvas, x, y);
+                    ch++;
+                    x += charWidth;
+                }
+
+                OutputDebugStringA(buff);
+                OutputDebugStringA("\n");
+            }
+        }
+
         StretchDIBits(dc, 0, 0, screenWidth, screenHeight, 0, 0, screenWidth, screenHeight, canvas.pixels, &bitmapInfo, DIB_RGB_COLORS, SRCCOPY);
 
+        start = end;
+
+
         //TODO: frame timing
-        //TODO: proper timing
-        Sleep(10);
+        //TODO: proper timing, currently just burning the CPU, dont forget about timeBeginPeriod
+        // Sleep(10);
     }
 
     ExitProcess(0);
