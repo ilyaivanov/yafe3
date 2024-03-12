@@ -1,0 +1,5 @@
+[y] Show a static file
+[ ] Move cursor around
+[ ] Offsets
+[ ] Remove chars
+[ ] Insert chars
