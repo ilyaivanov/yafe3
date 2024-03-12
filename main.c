@@ -123,7 +123,7 @@ void WinMainCRTStartup()
     InitFont(&font, FontInfoClearType("Consolas", 14, 0xfff0f0f0, 0x00000000), &arena);
 
     //TODO: remove fucking windows new line symbols
-    FileContent file = ReadMyFileImp("..\\main.c");
+    FileContent file = ReadMyFileImp("..\\progress.txt");
 
     MSG msg;
     LARGE_INTEGER frequency = {0};

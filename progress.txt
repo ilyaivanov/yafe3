@@ -1,5 +1,6 @@
 [y] Show a static file
-[ ] Move cursor around
-[ ] Offsets
+[y] Move cursor left\right
+[ ] Figure out what to do with Windows \r symbols
 [ ] Remove chars
 [ ] Insert chars
+[ ] Scroll screen
