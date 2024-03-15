@@ -1,6 +1,25 @@
-[y] Show a static file
-[y] Move cursor left\right
-[ ] Figure out what to do with Windows \r symbols
-[ ] Remove chars
-[ ] Insert chars
-[ ] Scroll screen
+[ ] Milestone 1: Duplicate Cymbolism functionality (edit text file with nested items, show\hide)
+  [y] Show a static file
+  [y] Move cursor left\right
+  [y] Figure out what to do with Windows \r symbols
+  [y] Remove chars
+  [y] Insert chars
+  [ ] Tab size using tab (2 for yafe 4 for C)
+  [ ] Scroll screen
+  [ ] Save\load file
+  [ ] Migrate editor from the old system 
+  [ ] Close\hide subnodes
+  [ ] Vimlike navigation in the project
+  [ ] Undo\redo history
+  [ ] Search history
+  [ ] Text wrap
+
+[ ] Backbuffer
+  [ ] File picker
+  [ ] Split screen
+  [ ] Multiple cursors
+  [ ] Colors
+
+[ ] Problems
+  [ ] I can't use the same cursor for SegoeUI and Consolas fonts. Non-monospaced fonts do not allow Vim-like cursor (it looks ugly because widths of chars are different).
+  

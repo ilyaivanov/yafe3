@@ -4,24 +4,26 @@
 #include "types.h"
 #include "win32.c"
 
+#include "string.c"
 #include "format.c"
 #include "font.c"
 
-
-// u32 bgColor
 
 f32 appScale;
 #define PX(val) ((val) *appScale)
 u32 screenWidth;
 u32 screenHeight;
 MyBitmap canvas;
-i32 isRunning = 1;
-i32 isFullscreen = 0;
-FontData font;
+bool isRunning = 1;
+bool isFullscreen = 0;
+FontData consolasFont14;
+FontData segoeUiFont14;
+
 BITMAPINFO bitmapInfo;
 u32 selectedChar;
 u32 lastFrames[20];
 u32 currentFrame;
+StringBuffer buffer;
 
 inline void CopyBitmapRectTo(MyBitmap *sourceT, MyBitmap *destination, u32 offsetX, u32 offsetY)
 {
@@ -60,6 +62,20 @@ inline void PaintRect(MyBitmap *destination, u32 offsetX, u32 offsetY, u32 width
         row -= destination->width;
     }
 }
+
+
+
+void InsertChartUnderCursor(StringBuffer* buffer, WPARAM ch)
+{
+    WPARAM code = ch == '\r' ? '\n' : ch;
+    InsertCharAt(buffer, selectedChar, code);
+    selectedChar++;
+    // UpdateCursorPosition(buffer, cursor.cursorIndex + 1);
+
+    // cursor.selectionStart = SELECTION_NONE;
+}
+
+
 
 LRESULT OnEvent(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -105,8 +121,17 @@ LRESULT OnEvent(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
                 case VK_RIGHT:
                     selectedChar++;
                 break;
+                case VK_DELETE:
+                    if(selectedChar < buffer.size)
+                        RemoveCharAt(&buffer, selectedChar);
+                break;
             }
         break; 
+        case WM_CHAR:
+            u8 DEL_CODE = 127;
+            if(wParam != DEL_CODE && (wParam >= ' ' || wParam == '\r'))
+                InsertChartUnderCursor(&buffer, wParam);
+        break;
     }
     return DefWindowProc(window, message, wParam, lParam);
 }
@@ -120,11 +145,13 @@ void WinMainCRTStartup()
     Arena arena = CreateArena(Megabytes(44));
 
     InitFontSystem();
-    InitFont(&font, FontInfoClearType("Consolas", 14, 0xfff0f0f0, 0x00000000), &arena);
+    InitFont(&consolasFont14, FontInfoClearType("Consolas", 14, 0xfff0f0f0, 0x00000000), &arena);
+    InitFont(&segoeUiFont14, FontInfoClearType("Segoe UI", 13, 0xfff0f0f0, 0x00000000), &arena);
 
-    //TODO: remove fucking windows new line symbols
-    FileContent file = ReadMyFileImp("..\\progress.txt");
-
+    // currentFont = &consolasFont14;
+    currentFont = &consolasFont14;
+    
+    buffer = ReadFileIntoDoubledSizedBuffer("..\\progress.txt");
     MSG msg;
     LARGE_INTEGER frequency = {0};
     LARGE_INTEGER start = {0};
@@ -144,37 +171,36 @@ void WinMainCRTStartup()
         u32 x = leftOffset;
         u32 y = 0;
 
-        char *ch = file.content;
+        char *ch = buffer.content;
         u32 i = 0;
 
         //TODO: handles only monospaced fonts
-        u32 charWidth = font.textures[*ch].width;
-        u32 charHeight = font.textures[*ch].height;
+        u32 charWidth = currentFont->charWidth;
         while (*ch)
         {
             i32 isVisible = *ch >= ' ' || *ch == '\n';
 
-            MyBitmap *texture = &font.textures[*ch];
+            MyBitmap *texture = &currentFont->textures[*ch];
+            u32 charWidth = currentFont->isMonospaced ? currentFont->charWidth : texture->width;
             if(isVisible)
             {
                 if(i == selectedChar)
-                    PaintRect(&canvas, x, y, charWidth, charHeight, 0xff7B2CBF);
+                    PaintRect(&canvas, x, y, charWidth, currentFont->charHeight, 0xff7B2CBF);
 
                 i++;
             }
 
             if (*ch >= ' ')
+            {
                 CopyBitmapRectTo(texture, &canvas, x, y);
+                x += charWidth + GetKerningValue(*ch, *(ch + 1)); 
 
-
-            if(isVisible)
-                x += charWidth;
-
+            }
 
             if (*ch == '\n')
             {
                 x = leftOffset;
-                y += font.textures[' '].height;
+                y += currentFont->charHeight;
             }
             ch++;
         }
@@ -205,7 +231,7 @@ void WinMainCRTStartup()
                 char buff[30];
                 i32 symbols = FormatNumber(averageFrame, buff);
                 i32 x = screenWidth - charWidth * (symbols + 2);
-                i32 y = screenHeight - charHeight;
+                i32 y = screenHeight - currentFont->charHeight;
                 buff[symbols] = 'u';
                 buff[symbols + 1] = 's';
                 buff[symbols + 2] = '\0';
@@ -213,7 +239,7 @@ void WinMainCRTStartup()
                 char* ch = buff;
                 while(*ch)
                 {
-                    MyBitmap *texture = &font.textures[*ch];
+                    MyBitmap *texture = &currentFont->textures[*ch];
                     CopyBitmapRectTo(texture, &canvas, x, y);
                     ch++;
                     x += charWidth;

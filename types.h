@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <windows.h>
 
 typedef uint64_t u64;
 typedef uint32_t u32;
@@ -14,6 +15,8 @@ typedef int8_t i8 ;
 
 typedef float f32;
 typedef double f64;
+
+typedef i32 bool;
 
 typedef struct MyBitmap
 {

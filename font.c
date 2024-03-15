@@ -49,12 +49,14 @@ typedef struct FontData
     // https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-getcharabcwidthsa
 
     TEXTMETRIC textMetric;
-    
+    bool isMonospaced;
+    u32 charWidth;
+    u32 charHeight;
     FontKerningPair* pairsHash;
 } FontData;
 
 
-const FontData *currentFont;
+FontData *currentFont;
 
 // Segoe UI has around 8k pairs, monospace has none pairs
 #define PAIRS_HASH_LENGTH 16 * 1024
@@ -194,6 +196,14 @@ void InitFontData(FontData *fontData, FontInfo fontInfo, Arena* arena)
     }
 
     GetTextMetricsA(deviceContext, &fontData->textMetric);
+
+    if(fontData->textures['i'].width == fontData->textures['W'].width)
+    {
+        fontData->isMonospaced = 1;
+        fontData->charWidth = fontData->textures['W'].width;
+    }
+    fontData->charHeight = fontData->textMetric.tmHeight;
+
     // DeleteObject(bitmap);
     DeleteObject(font);
     // DeleteDC(deviceContext);
@@ -205,14 +215,9 @@ void InitFont(FontData *font, FontInfo info, Arena* arena)
     InitFontData(font, info, arena);
 }
 
-i32 IsMonospaced(const FontData* font)
-{
-    return font->pairsHash == NULL;
-}
-
 inline int GetKerningValue(u16 left, u16 right)
 {
-    if(IsMonospaced(currentFont))
+    if(currentFont->isMonospaced)
         return 0;
 
     i32 index = HashAndProbeIndex(currentFont, left, right);
