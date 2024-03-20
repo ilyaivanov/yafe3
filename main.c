@@ -7,6 +7,7 @@
 #include "string.c"
 #include "format.c"
 #include "font.c"
+#include "cursor.c"
 
 
 f32 appScale;
@@ -16,11 +17,12 @@ u32 screenHeight;
 MyBitmap canvas;
 bool isRunning = 1;
 bool isFullscreen = 0;
+bool isSpecialSymbolsShown = 0;
 FontData consolasFont14;
 FontData segoeUiFont14;
 
 BITMAPINFO bitmapInfo;
-u32 selectedChar;
+Cursor cursor;
 u32 lastFrames[20];
 u32 currentFrame;
 StringBuffer buffer;
@@ -68,8 +70,8 @@ inline void PaintRect(MyBitmap *destination, u32 offsetX, u32 offsetY, u32 width
 void InsertChartUnderCursor(StringBuffer* buffer, WPARAM ch)
 {
     WPARAM code = ch == '\r' ? '\n' : ch;
-    InsertCharAt(buffer, selectedChar, code);
-    selectedChar++;
+    InsertCharAt(buffer, cursor.pos, code);
+    cursor.pos++;
     // UpdateCursorPosition(buffer, cursor.cursorIndex + 1);
 
     // cursor.selectionStart = SELECTION_NONE;
@@ -114,16 +116,25 @@ LRESULT OnEvent(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
                     isFullscreen = !isFullscreen;
                     SetFullscreen(window, isFullscreen);
                 break;
+                case VK_F2:
+                    isSpecialSymbolsShown = !isSpecialSymbolsShown;
+                break;
                 case VK_LEFT:
-                    if(selectedChar >= 0)
-                        selectedChar--;
+                    CursorMoveLeft(&cursor, &buffer);
                 break;
                 case VK_RIGHT:
-                    selectedChar++;
+                    CursorMoveRight(&cursor, &buffer);
                 break;
-                case VK_DELETE:
-                    if(selectedChar < buffer.size)
-                        RemoveCharAt(&buffer, selectedChar);
+                case VK_DOWN:
+                    CursorMoveDown(&cursor, &buffer);
+                break;
+                case VK_UP:
+                    CursorMoveUp(&cursor, &buffer);
+                break;
+                case
+                 VK_DELETE:
+                    if(cursor.pos < buffer.size)
+                        RemoveCharAt(&buffer, cursor.pos);
                 break;
             }
         break; 
@@ -180,17 +191,25 @@ void WinMainCRTStartup()
         {
             i32 isVisible = *ch >= ' ' || *ch == '\n';
 
-            MyBitmap *texture = &currentFont->textures[*ch];
+            char textureIndex = 0;
+            
+            if(isSpecialSymbolsShown)
+                textureIndex = *ch == ' ' ? 1 : (*ch == '\n' ? 2 : *ch);
+            else 
+                textureIndex = *ch;
+
+
+            MyBitmap *texture = &currentFont->textures[textureIndex];
             u32 charWidth = currentFont->isMonospaced ? currentFont->charWidth : texture->width;
             if(isVisible)
             {
-                if(i == selectedChar)
+                if(i == cursor.pos)
                     PaintRect(&canvas, x, y, charWidth, currentFont->charHeight, 0xff7B2CBF);
 
                 i++;
             }
 
-            if (*ch >= ' ')
+            if (isVisible)
             {
                 CopyBitmapRectTo(texture, &canvas, x, y);
                 x += charWidth + GetKerningValue(*ch, *(ch + 1)); 

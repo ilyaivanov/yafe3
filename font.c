@@ -195,6 +195,41 @@ void InitFontData(FontData *fontData, FontInfo fontInfo, Arena* arena)
         CopyRectTo(&fontCanvas, texture, fontInfo);
     }
 
+    {
+        wchar_t dotCh = 0xb7; //·
+        int len = 1;
+        GetTextExtentPoint32W(deviceContext, &dotCh, len, &size);
+
+        TextOutW(deviceContext, 0, 0, &dotCh, len);
+
+        MyBitmap *texture = &fontData->textures[1];
+        texture->width = size.cx;
+        texture->height = size.cy;
+        texture->bytesPerPixel = 4;
+
+        texture->pixels = (u32*) ArenaPush(arena, texture->height * texture->width * texture->bytesPerPixel);
+
+        CopyRectTo(&fontCanvas, texture, fontInfo);
+    }
+
+    {
+        wchar_t dotCh = 0x00B6; //¶
+        int len = 1;
+        GetTextExtentPoint32W(deviceContext, &dotCh, len, &size);
+
+        TextOutW(deviceContext, 0, 0, &dotCh, len);
+
+        MyBitmap *texture = &fontData->textures[2];
+        texture->width = size.cx;
+        texture->height = size.cy;
+        texture->bytesPerPixel = 4;
+
+        texture->pixels = (u32*) ArenaPush(arena, texture->height * texture->width * texture->bytesPerPixel);
+
+        CopyRectTo(&fontCanvas, texture, fontInfo);
+    }
+
+
     GetTextMetricsA(deviceContext, &fontData->textMetric);
 
     if(fontData->textures['i'].width == fontData->textures['W'].width)

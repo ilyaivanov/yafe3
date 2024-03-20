@@ -91,3 +91,24 @@ StringBuffer ReadFileIntoDoubledSizedBuffer(char *path)
     PlaceLineEnd(&res);
     return res;
 }
+
+i32 IndexAfter(StringBuffer* buffer, i32 after, char ch)
+{
+    for(int i = after + 1; i < buffer->size; i++)
+    {
+        if(*(buffer->content + i) == ch)
+            return i;
+    }
+    return -1;
+}
+
+
+i32 IndexBefore(StringBuffer* buffer, i32 before, char ch)
+{
+    for(int i = before - 1; i >= 0; i--)
+    {
+        if(*(buffer->content + i) == ch)
+            return i;
+    }
+    return -1;
+}
