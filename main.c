@@ -9,22 +9,30 @@
 #include "font.c"
 #include "cursor.c"
 
+#include "performance.c"
+
+typedef enum Mode
+{
+    ModeNormal,
+    ModeInsert
+} Mode;
 
 f32 appScale;
 #define PX(val) ((val) *appScale)
+
 u32 screenWidth;
 u32 screenHeight;
 MyBitmap canvas;
 bool isRunning = 1;
 bool isFullscreen = 0;
 bool isSpecialSymbolsShown = 0;
+bool isJustSwitchedModeToInsert = 0;
+Mode mode = ModeNormal;
 FontData consolasFont14;
 FontData segoeUiFont14;
 
 BITMAPINFO bitmapInfo;
 Cursor cursor;
-u32 lastFrames[20];
-u32 currentFrame;
 StringBuffer buffer;
 
 inline void CopyBitmapRectTo(MyBitmap *sourceT, MyBitmap *destination, u32 offsetX, u32 offsetY)
@@ -119,32 +127,88 @@ LRESULT OnEvent(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
                 case VK_F2:
                     isSpecialSymbolsShown = !isSpecialSymbolsShown;
                 break;
-                case VK_LEFT:
-                    CursorMoveLeft(&cursor, &buffer);
+                case 'H':
+                    if(mode == ModeNormal)
+                        CursorMoveLeft(&cursor, &buffer);
                 break;
-                case VK_RIGHT:
-                    CursorMoveRight(&cursor, &buffer);
+                case 'L':
+                    if(mode == ModeNormal)
+                        CursorMoveRight(&cursor, &buffer);
                 break;
-                case VK_DOWN:
-                    CursorMoveDown(&cursor, &buffer);
+                case 'J':
+                    if(mode == ModeNormal)
+                        CursorMoveDown(&cursor, &buffer);
                 break;
-                case VK_UP:
-                    CursorMoveUp(&cursor, &buffer);
+                case 'K':
+                    if(mode == ModeNormal)
+                        CursorMoveUp(&cursor, &buffer);
                 break;
-                case
-                 VK_DELETE:
+                case VK_DELETE:
                     if(cursor.pos < buffer.size)
                         RemoveCharAt(&buffer, cursor.pos);
+                case VK_BACK:
+                    if(cursor.pos > 0)
+                    {
+                        RemoveCharAt(&buffer, cursor.pos - 1);
+                        cursor.pos--;
+                    }
+                break;
+                case 'I':
+                    if(mode == ModeNormal)
+                    {
+                        mode = ModeInsert;
+                        isJustSwitchedModeToInsert = 1;
+                    }
+                break;
+                case VK_ESCAPE:
+                    if(mode == ModeInsert)
+                    {
+                        mode = ModeNormal;
+                    }
                 break;
             }
         break; 
         case WM_CHAR:
-            u8 DEL_CODE = 127;
-            if(wParam != DEL_CODE && (wParam >= ' ' || wParam == '\r'))
-                InsertChartUnderCursor(&buffer, wParam);
+            if(isJustSwitchedModeToInsert)
+                isJustSwitchedModeToInsert = 0;
+            else if(mode == ModeInsert)
+            {
+                u8 DEL_CODE = 127;
+                if(wParam != DEL_CODE && (wParam >= ' ' || wParam == '\r'))
+                    InsertChartUnderCursor(&buffer, wParam);
+            }
         break;
     }
     return DefWindowProc(window, message, wParam, lParam);
+}
+
+void ReportAt(i32 rowIndex, char* label, u32 val)
+{
+    char buff[40];
+    u32 buffIndex = 0;
+    while (*label)
+    {
+        buff[buffIndex++] = *label;
+        label++;
+    }
+    buff[buffIndex++] = ':';
+    buff[buffIndex++] = ' ';
+
+    i32 symbols = FormatNumber(val, buff + buffIndex);
+    i32 x = screenWidth - currentFont->charWidth * (symbols + buffIndex + 2);
+    i32 y = screenHeight - currentFont->charHeight * (rowIndex + 1);
+    buff[symbols + buffIndex] = 'u';
+    buff[symbols + buffIndex + 1] = 's';
+    buff[symbols + buffIndex + 2] = '\0';
+
+    char *ch = buff;
+    while (*ch)
+    {
+        MyBitmap *texture = &currentFont->textures[*ch];
+        CopyBitmapRectTo(texture, &canvas, x, y);
+        ch++;
+        x += currentFont->charWidth;
+    }
 }
 
 void WinMainCRTStartup()
@@ -164,10 +228,8 @@ void WinMainCRTStartup()
     
     buffer = ReadFileIntoDoubledSizedBuffer("..\\progress.txt");
     MSG msg;
-    LARGE_INTEGER frequency = {0};
-    LARGE_INTEGER start = {0};
-    QueryPerformanceFrequency(&frequency);
-    QueryPerformanceCounter(&start);
+    InitPerf();
+
     while(isRunning)
     {
         while(PeekMessageA(&msg, 0, 0, 0, PM_REMOVE))
@@ -175,9 +237,11 @@ void WinMainCRTStartup()
             TranslateMessage(&msg);
             DispatchMessageA(&msg);
         }
-
+        StartMetric(Memory);
         memset(canvas.pixels, 0, canvas.bytesPerPixel * canvas.width * canvas.height);
+        u32 usMemory = EndMetric(Memory);
 
+        StartMetric(Draw);
         f32 leftOffset = PX(6);
         u32 x = leftOffset;
         u32 y = 0;
@@ -204,7 +268,10 @@ void WinMainCRTStartup()
             if(isVisible)
             {
                 if(i == cursor.pos)
-                    PaintRect(&canvas, x, y, charWidth, currentFont->charHeight, 0xff7B2CBF);
+                {
+                    u32 color = mode == ModeNormal ? 0xff7B2CBF : 0xffBF2C7B;
+                    PaintRect(&canvas, x, y, charWidth, currentFont->charHeight, color);
+                }
 
                 i++;
             }
@@ -225,57 +292,24 @@ void WinMainCRTStartup()
         }
 
 
+        u32 usDraw = EndMetric(Draw);
 
+        u32 usPerFrame = EndMetric(Overall);
 
-        LARGE_INTEGER end = {0};
-        QueryPerformanceCounter(&end);
+        ReportAt(3, "Memory", usMemory);
+        ReportAt(2, "Drawing", usDraw);
+        ReportAt(1, "DiBits", GetMicrosecondsFor(DiBits));
+        ReportAt(0, "Overall", usPerFrame);
 
-        u32 usPerFrame = (u32)((f32)((end.QuadPart - start.QuadPart) * 1000 * 1000) / (f32)frequency.QuadPart);
-        lastFrames[currentFrame] = usPerFrame;
-        currentFrame = (currentFrame + 1) % ArrayLength(lastFrames);
-        i32 hasAnyZeroFrame = 0;
-        {
-            u32 averageFrame = 0;
-            for(int i = 0; i < ArrayLength(lastFrames); i++)
-            {
-                if(!lastFrames[i])
-                    hasAnyZeroFrame = 1;
-                averageFrame += lastFrames[i];
-            }
-
-            if(!hasAnyZeroFrame)
-            {
-                averageFrame /= ArrayLength(lastFrames);
-
-                char buff[30];
-                i32 symbols = FormatNumber(averageFrame, buff);
-                i32 x = screenWidth - charWidth * (symbols + 2);
-                i32 y = screenHeight - currentFont->charHeight;
-                buff[symbols] = 'u';
-                buff[symbols + 1] = 's';
-                buff[symbols + 2] = '\0';
-
-                char* ch = buff;
-                while(*ch)
-                {
-                    MyBitmap *texture = &currentFont->textures[*ch];
-                    CopyBitmapRectTo(texture, &canvas, x, y);
-                    ch++;
-                    x += charWidth;
-                }
-
-                OutputDebugStringA(buff);
-                OutputDebugStringA("\n");
-            }
-        }
-
+        StartMetric(DiBits);
         StretchDIBits(dc, 0, 0, screenWidth, screenHeight, 0, 0, screenWidth, screenHeight, canvas.pixels, &bitmapInfo, DIB_RGB_COLORS, SRCCOPY);
+        EndMetric(DiBits);
 
-        start = end;
+        
+        
+        EndFrame();
 
-
-        //TODO: frame timing
-        //TODO: proper timing, currently just burning the CPU, dont forget about timeBeginPeriod
+        //TODO: proper sleep timing, currently just burning the CPU, dont forget about timeBeginPeriod
         // Sleep(10);
     }
 
